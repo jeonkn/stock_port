@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ ticker }} - 차트 분석</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            width: 95%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .chart-section {
+            padding: 20px;
+        }
+        .chart-container {
+            margin-bottom: 30px;
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        .chart-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            text-align: center;
+        }
+        .chart-canvas {
+            position: relative;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+        .stoch-chart-canvas {
+            position: relative;
+            height: 200px;
+            margin-bottom: 20px;
+        }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: #e74c3c;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                width: 98%;
+                margin: 5px auto;
+            }
+            .chart-canvas {
+                height: 250px;
+            }
+            .stoch-chart-canvas {
+                height: 180px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📈 {{ ticker }} 차트 분석</h1>
+        </div>
+        
+        <div class="chart-section">
+            <!-- 주가 및 이동평균선 차트 -->
+            <div class="chart-container">
+                <div class="chart-title">주가 및 이동평균선</div>
+                <div class="chart-canvas">
+                    <canvas id="priceChart"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #2c3e50;"></div>
+                        <span>종가</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e74c3c;"></div>
+                        <span>5일선</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #f39c12;"></div>
+                        <span>20일선</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #27ae60;"></div>
+                        <span>50일선</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #3498db;"></div>
+                        <span>120일선</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #9b59b6;"></div>
+                        <span>200일선</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 스토캐스틱 5,3,3 차트 -->
+            <div class="chart-container">
+                <div class="chart-title">스토캐스틱 (5,3,3)</div>
+                <div class="stoch-chart-canvas">
+                    <canvas id="stoch533Chart"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e74c3c;"></div>
+                        <span>%K (5,3,3)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #3498db;"></div>
+                        <span>%D (5,3,3)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 스토캐스틱 10,6,6 차트 -->
+            <div class="chart-container">
+                <div class="chart-title">스토캐스틱 (10,6,6)</div>
+                <div class="stoch-chart-canvas">
+                    <canvas id="stoch1066Chart"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e74c3c;"></div>
+                        <span>%K (10,6,6)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #3498db;"></div>
+                        <span>%D (10,6,6)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 스토캐스틱 20,12,12 차트 -->
+            <div class="chart-container">
+                <div class="chart-title">스토캐스틱 (20,12,12)</div>
+                <div class="stoch-chart-canvas">
+                    <canvas id="stoch201212Chart"></canvas>
+                </div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e74c3c;"></div>
+                        <span>%K (20,12,12)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #3498db;"></div>
+                        <span>%D (20,12,12)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 차트 데이터
+        const chartData = {{ chart_data|safe }};
+        
+        // Chart.js 기본 설정
+        Chart.defaults.font.size = 11;
+        Chart.defaults.plugins.legend.display = false;
+
+        // 주가 및 이동평균선 차트
+        const priceCtx = document.getElementById('priceChart').getContext('2d');
+        const priceChart = new Chart(priceCtx, {
+            type: 'line',
+            data: {
+                labels: chartData.dates,
+                datasets: [
+                    {
+                        label: '종가',
+                        data: chartData.close,
+                        borderColor: '#2c3e50',
+                        borderWidth: 1.5,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    },
+                    {
+                        label: '5일선',
+                        data: chartData.ma5,
+                        borderColor: '#e74c3c',
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    },
+                    {
+                        label: '20일선',
+                        data: chartData.ma20,
+                        borderColor: '#f39c12',
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    },
+                    {
+                        label: '50일선',
+                        data: chartData.ma50,
+                        borderColor: '#27ae60',
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    },
+                    {
+                        label: '120일선',
+                        data: chartData.ma120,
+                        borderColor: '#3498db',
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    },
+                    {
+                        label: '200일선',
+                        data: chartData.ma200,
+                        borderColor: '#9b59b6',
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: {
+                            color: 'rgba(0,0,0,0.05)',
+                            lineWidth: 0.5
+                        },
+                        ticks: {
+                            font: {
+                                size: 10
+                            },
+                            maxTicksLimit: 6,
+                            callback: function(value, index, values) {
+                                return Math.round(value).toLocaleString();
+                            }
+                        }
+                    },
+                    x: {
+                        display: false,
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            }
+        });
+
+        // 스토캐스틱 5,3,3 차트
+        const stoch533Ctx = document.getElementById('stoch533Chart').getContext('2d');
+        const stoch533Chart = new Chart(stoch533Ctx, {
+            type: 'line',
+            data: {
+                labels: chartData.dates,
+                datasets: [
+                    {
+                        label: '%K (5,3,3)',
+                        data: chartData.stoch_5_3_3_k,
+                        borderColor: '#e74c3c',
+                        borderWidth: 1.5,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    },
+                    {
+                        label: '%D (5,3,3)',
+                        data: chartData.stoch_5_3_3_d,
+                        borderColor: '#3498db',
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        grid: {
+                            color: 'rgba(0,0,0,0.05)',
+                            lineWidth: 0.5
+                        },
+                        ticks: {
+                            font: {
+                                size: 10
+                            },
+                            stepSize: 20,
+                            callback: function(value) {
+                                return [0, 20, 40, 60, 80, 100].includes(value) ? value : '';
+                            }
+                        }
+                    },
+                    x: {
+                        display: false,
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            }
+        });
+
+        // 스토캐스틱 10,6,6 차트
+        const stoch1066Ctx = document.getElementById('stoch1066Chart').getContext('2d');
+        const stoch1066Chart = new Chart(stoch1066Ctx, {
+            type: 'line',
+            data: {
+                labels: chartData.dates,
+                datasets: [
+                    {
+                        label: '%K (10,6,6)',
+                        data: chartData.stoch_10_6_6_k,
+                        borderColor: '#e74c3c',
+                        borderWidth: 1.5,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    },
+                    {
+                        label: '%D (10,6,6)',
+                        data: chartData.stoch_10_6_6_d,
+                        borderColor: '#3498db',
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        grid: {
+                            color: 'rgba(0,0,0,0.05)',
+                            lineWidth: 0.5
+                        },
+                        ticks: {
+                            font: {
+                                size: 10
+                            },
+                            stepSize: 20,
+                            callback: function(value) {
+                                return [0, 20, 40, 60, 80, 100].includes(value) ? value : '';
+                            }
+                        }
+                    },
+                    x: {
+                        display: false,
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            }
+        });
+
+        // 스토캐스틱 20,12,12 차트
+        const stoch201212Ctx = document.getElementById('stoch201212Chart').getContext('2d');
+        const stoch201212Chart = new Chart(stoch201212Ctx, {
+            type: 'line',
+            data: {
+                labels: chartData.dates,
+                datasets: [
+                    {
+                        label: '%K (20,12,12)',
+                        data: chartData.stoch_20_12_12_k,
+                        borderColor: '#e74c3c',
+                        borderWidth: 1.5,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    },
+                    {
+                        label: '%D (20,12,12)',
+                        data: chartData.stoch_20_12_12_d,
+                        borderColor: '#3498db',
+                        borderWidth: 1,
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 3,
+                        tension: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        grid: {
+                            color: 'rgba(0,0,0,0.05)',
+                            lineWidth: 0.5
+                        },
+                        ticks: {
+                            font: {
+                                size: 10
+                            },
+                            stepSize: 20,
+                            callback: function(value) {
+                                return [0, 20, 40, 60, 80, 100].includes(value) ? value : '';
+                            }
+                        }
+                    },
+                    x: {
+                        display: false,
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            }
+        });
+
+        // 스토캐스틱 차트에 30, 70 기준선 추가
+        function addStochasticLines(chart) {
+            const ctx = chart.ctx;
+            const chartArea = chart.chartArea;
+            
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 99, 132, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            
+            // 30 라인
+            const y30 = chart.scales.y.getPixelForValue(30);
+            ctx.beginPath();
+            ctx.moveTo(chartArea.left, y30);
+            ctx.lineTo(chartArea.right, y30);
+            ctx.stroke();
+            
+            // 70 라인
+            const y70 = chart.scales.y.getPixelForValue(70);
+            ctx.beginPath();
+            ctx.moveTo(chartArea.left, y70);
+            ctx.lineTo(chartArea.right, y70);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        // 차트 그리기 후 기준선 추가
+        Chart.register({
+            id: 'stochasticLines',
+            afterDraw: function(chart) {
+                if (chart.canvas.id.includes('stoch')) {
+                    addStochasticLines(chart);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
