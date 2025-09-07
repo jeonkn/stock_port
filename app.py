@@ -10,7 +10,13 @@ import time
 st.set_page_config(page_title="한국/미국 주식 기술적 분석", layout="wide")
 
 # 미국 주식 시총 상위 50개 티커 (주기적으로 업데이트 필요)
-US_TOP50_TICKERS = ["MSFT", "GOOG", "META", "AMZN", "AAPL", "TSLA", "NVDA", "AVGO", "ORCL", "PLTR", "IONQ", "RKLB", "TEM", "HIMS", "CRDO", "CLS", "NVO", "JOBY", "SPOT", "OKLO", "RCL", "NBIS", "JPM", "PGY", "SMCI"]
+US_TOP50_TICKERS = [
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AVGO', 'WMT', 'LLY',
+    'JPM', 'V', 'UNH', 'ORCL', 'MA', 'HD', 'PG', 'COST', 'NFLX', 'BAC',
+    'ABBV', 'CRM', 'KO', 'ASML', 'MRK', 'CVX', 'AMD', 'ACN', 'PEP', 'TMO',
+    'LIN', 'CSCO', 'ABT', 'ADBE', 'NKE', 'TXN', 'WFC', 'PM', 'VZ', 'RTX',
+    'SPGI', 'INTU', 'IBM', 'T', 'CAT', 'GE', 'MDT', 'HON', 'LOW', 'UPS'
+]
 
 def format_market_cap(value):
     """시가총액을 축약 형태로 표시"""
@@ -115,12 +121,22 @@ def calculate_technical_indicators_kr(ticker, period_days=252):
         # 현재가 (최신 종가)
         current_price = df['종가'].iloc[-1]
         
-        # RSI 계산 (14일)
+        # RSI 계산 (14일) - Wilder's Smoothing 방식
         def calculate_rsi(prices, window=14):
             delta = prices.diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-            rs = gain / loss
+            gain = delta.where(delta > 0, 0)
+            loss = -delta.where(delta < 0, 0)
+            
+            # 첫 번째 평균은 단순 평균
+            avg_gain = gain.rolling(window=window).mean()
+            avg_loss = loss.rolling(window=window).mean()
+            
+            # Wilder's Smoothing 적용
+            for i in range(window, len(gain)):
+                avg_gain.iloc[i] = (avg_gain.iloc[i-1] * (window-1) + gain.iloc[i]) / window
+                avg_loss.iloc[i] = (avg_loss.iloc[i-1] * (window-1) + loss.iloc[i]) / window
+            
+            rs = avg_gain / avg_loss
             rsi = 100 - (100 / (1 + rs))
             return rsi
         
