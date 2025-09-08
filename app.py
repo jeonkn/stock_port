@@ -10,13 +10,7 @@ import time
 st.set_page_config(page_title="한국/미국 주식 기술적 분석", layout="wide")
 
 # 미국 주식 시총 상위 50개 티커 (주기적으로 업데이트 필요)
-US_TOP50_TICKERS = [
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AVGO', 'WMT', 'LLY',
-    'JPM', 'V', 'UNH', 'ORCL', 'MA', 'HD', 'PG', 'COST', 'NFLX', 'BAC',
-    'ABBV', 'CRM', 'KO', 'ASML', 'MRK', 'CVX', 'AMD', 'ACN', 'PEP', 'TMO',
-    'LIN', 'CSCO', 'ABT', 'ADBE', 'NKE', 'TXN', 'WFC', 'PM', 'VZ', 'RTX',
-    'SPGI', 'INTU', 'IBM', 'T', 'CAT', 'GE', 'MDT', 'HON', 'LOW', 'UPS'
-]
+US_TOP50_TICKERS = ["MSFT", "GOOG", "META", "AMZN", "AAPL", "TSLA", "NVDA", "AVGO", "ORCL", "PLTR", "IONQ", "RKLB", "TEM", "HIMS", "CRDO", "CLS", "NVO", "JOBY", "SPOT", "OKLO", "RCL", "NBIS", "JPM", "PGY", "SMCI"]
 
 def format_market_cap(value):
     """시가총액을 축약 형태로 표시"""
