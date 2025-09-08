@@ -194,9 +194,19 @@ def calculate_technical_indicators_us(ticker, period_days=252):
         # RSI 계산 (14일)
         def calculate_rsi(prices, window=14):
             delta = prices.diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
-            rs = gain / loss
+            gain = delta.where(delta > 0, 0)
+            loss = -delta.where(delta < 0, 0)
+            
+            # 첫 번째 평균은 단순 평균
+            avg_gain = gain.rolling(window=window).mean()
+            avg_loss = loss.rolling(window=window).mean()
+            
+            # Wilder's Smoothing 적용
+            for i in range(window, len(gain)):
+                avg_gain.iloc[i] = (avg_gain.iloc[i-1] * (window-1) + gain.iloc[i]) / window
+                avg_loss.iloc[i] = (avg_loss.iloc[i-1] * (window-1) + loss.iloc[i]) / window
+            
+            rs = avg_gain / avg_loss
             rsi = 100 - (100 / (1 + rs))
             return rsi
         
