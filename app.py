@@ -432,7 +432,7 @@ def display_results(df, original_count, filter_applied, country):
 
 def main():
     st.title("🌍 한국/미국 주식 기술적 분석")
-    st.markdown("### 시가총액 상위 50개 종목의 기술적 지표 분석")
+    st.markdown("### 시가총액 상위 100개 종목의 기술적 지표 분석")
     
     # 세션 상태 초기화
     if 'korean_data' not in st.session_state:
