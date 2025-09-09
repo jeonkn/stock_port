@@ -9,8 +9,8 @@ import time
 # 페이지 설정
 st.set_page_config(page_title="한국/미국 주식 기술적 분석", layout="wide")
 
-# 미국 주식 시총 상위 50개 티커 (주기적으로 업데이트 필요)
-US_TOP50_TICKERS = ["MSFT", "GOOG", "META", "AMZN", "AAPL", "TSLA", "NVDA", "AVGO", "ORCL", "PLTR", "IONQ", "RKLB", "TEM", "HIMS", "CRDO", "CLS", "NVO", "JOBY", "SPOT", "OKLO", "RCL", "NBIS", "JPM", "PGY", "SMCI"]
+# 기본 미국 주식 시총 상위 50개 티커 (기본값)
+DEFAULT_US_TICKERS = ["MSFT", "GOOG", "META", "AMZN", "AAPL", "TSLA", "NVDA", "AVGO", "ORCL", "PLTR", "IONQ", "RKLB", "TEM", "HIMS", "CRDO", "CLS", "NVO", "JOBY", "SPOT", "OKLO", "RCL", "NBIS", "JPM", "PGY", "SMCI"]
 
 def format_market_cap(value):
     """시가총액을 축약 형태로 표시"""
@@ -52,15 +52,26 @@ def get_market_cap_top100():
         st.error(f"시가총액 데이터 조회 오류: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=3600)  # 1시간 캐시
-def get_us_stock_data():
-    """미국 주식 상위 50개 종목 정보 조회"""
+def validate_ticker(ticker):
+    """티커가 유효한지 검증"""
+    try:
+        stock_info = yf.Ticker(ticker)
+        info = stock_info.info
+        # 기본적인 정보가 있는지 확인
+        if info.get('symbol') or info.get('shortName') or info.get('longName'):
+            return True
+        return False
+    except:
+        return False
+
+def get_us_stock_data(tickers_list):
+    """미국 주식 정보 조회 (사용자 정의 티커 리스트 사용)"""
     try:
         results = []
         progress_placeholder = st.empty()
         
-        for i, ticker in enumerate(US_TOP50_TICKERS):
-            progress_placeholder.text(f"미국 주식 정보 조회 중... ({i+1}/{len(US_TOP50_TICKERS)})")
+        for i, ticker in enumerate(tickers_list):
+            progress_placeholder.text(f"미국 주식 정보 조회 중... ({i+1}/{len(tickers_list)})")
             
             try:
                 stock_info = yf.Ticker(ticker)
@@ -68,7 +79,7 @@ def get_us_stock_data():
                 
                 # 시가총액과 회사명 추출
                 market_cap = info.get('marketCap', 0)
-                company_name = info.get('longName', ticker)
+                company_name = info.get('longName', info.get('shortName', ticker))
                 
                 results.append({
                     'ticker': ticker,
@@ -306,8 +317,11 @@ def load_korean_stocks():
 
 def load_us_stocks():
     """미국 주식 데이터 로딩"""
-    with st.spinner("미국 주식 상위 50개 종목 조회 중..."):
-        us_stocks = get_us_stock_data()
+    # 세션 상태에서 사용자 정의 티커 리스트 가져오기
+    current_tickers = st.session_state.get('us_tickers', DEFAULT_US_TICKERS.copy())
+    
+    with st.spinner(f"미국 주식 {len(current_tickers)}개 종목 조회 중..."):
+        us_stocks = get_us_stock_data(current_tickers)
     
     if us_stocks.empty:
         st.error("미국 주식 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.")
@@ -358,6 +372,95 @@ def load_us_stocks():
     status_text.empty()
     
     return pd.DataFrame(results)
+
+def manage_us_tickers():
+    """미국 주식 티커 관리 인터페이스"""
+    st.sidebar.subheader("🔧 미국 주식 티커 관리")
+    
+    # 세션 상태에서 현재 티커 리스트 가져오기
+    if 'us_tickers' not in st.session_state:
+        st.session_state.us_tickers = DEFAULT_US_TICKERS.copy()
+    
+    current_tickers = st.session_state.us_tickers
+    
+    # 현재 티커 수 표시
+    st.sidebar.write(f"현재 등록된 종목: {len(current_tickers)}개")
+    
+    # 티커 추가 섹션
+    with st.sidebar.expander("➕ 티커 추가", expanded=False):
+        new_ticker = st.text_input(
+            "추가할 티커 입력",
+            placeholder="예: NFLX, DIS, etc.",
+            key="new_ticker_input"
+        ).upper().strip()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("✅ 추가", key="add_ticker"):
+                if new_ticker:
+                    if new_ticker not in current_tickers:
+                        # 티커 유효성 검증
+                        with st.spinner(f"{new_ticker} 유효성 검증 중..."):
+                            if validate_ticker(new_ticker):
+                                st.session_state.us_tickers.append(new_ticker)
+                                st.success(f"{new_ticker} 추가됨!")
+                                # 데이터 새로고침 필요
+                                st.session_state.us_data = None
+                                st.session_state.data_loaded = False
+                                st.rerun()
+                            else:
+                                st.error(f"{new_ticker}는 유효하지 않은 티커입니다.")
+                    else:
+                        st.warning(f"{new_ticker}는 이미 등록된 티커입니다.")
+                else:
+                    st.warning("티커를 입력해주세요.")
+        
+        with col2:
+            if st.button("🔄 초기화", key="reset_tickers"):
+                st.session_state.us_tickers = DEFAULT_US_TICKERS.copy()
+                st.session_state.us_data = None
+                st.session_state.data_loaded = False
+                st.success("티커 목록이 초기화되었습니다!")
+                st.rerun()
+    
+    # 티커 제거 섹션
+    with st.sidebar.expander("➖ 티커 제거", expanded=False):
+        if current_tickers:
+            # 현재 티커들을 정렬해서 표시
+            sorted_tickers = sorted(current_tickers)
+            
+            # 선택 가능한 티커 리스트
+            tickers_to_remove = st.multiselect(
+                "제거할 티커 선택",
+                sorted_tickers,
+                key="tickers_to_remove"
+            )
+            
+            if st.button("🗑️ 선택 항목 제거", key="remove_tickers"):
+                if tickers_to_remove:
+                    for ticker in tickers_to_remove:
+                        if ticker in st.session_state.us_tickers:
+                            st.session_state.us_tickers.remove(ticker)
+                    
+                    # 데이터 새로고침 필요
+                    st.session_state.us_data = None
+                    st.session_state.data_loaded = False
+                    st.success(f"{len(tickers_to_remove)}개 티커가 제거되었습니다!")
+                    st.rerun()
+                else:
+                    st.warning("제거할 티커를 선택해주세요.")
+        else:
+            st.write("제거할 티커가 없습니다.")
+    
+    # 현재 티커 목록 표시
+    with st.sidebar.expander("📋 현재 티커 목록", expanded=False):
+        if current_tickers:
+            # 5개씩 한 줄에 표시
+            ticker_chunks = [current_tickers[i:i+5] for i in range(0, len(current_tickers), 5)]
+            for chunk in ticker_chunks:
+                st.write(" • ".join(chunk))
+        else:
+            st.write("등록된 티커가 없습니다.")
 
 def apply_filters(df, rsi_filter, bb_percent_filter, bb_width_filter):
     """필터 적용 (메모리에서 빠르게 처리)"""
@@ -431,8 +534,8 @@ def display_results(df, original_count, filter_applied, country):
     )
 
 def main():
-    st.title("🌍 한국/미국 주식 기술적 분석")
-    st.markdown("### 시가총액 상위 100개 종목의 기술적 지표 분석")
+    st.title("🌏 한국/미국 주식 기술적 분석")
+    st.markdown("### 시가총액 상위 종목의 기술적 지표 분석")
     
     # 세션 상태 초기화
     if 'korean_data' not in st.session_state:
@@ -443,16 +546,22 @@ def main():
         st.session_state.data_loaded = False
     if 'current_country' not in st.session_state:
         st.session_state.current_country = "한국"
+    if 'us_tickers' not in st.session_state:
+        st.session_state.us_tickers = DEFAULT_US_TICKERS.copy()
     
     # 사이드바 설정
     st.sidebar.header("설정")
     
     # 국가 선택
     country = st.sidebar.selectbox(
-        "🌍 국가 선택",
+        "🌏 국가 선택",
         ["한국", "미국"],
         index=0
     )
+    
+    # 미국 선택 시 티커 관리 인터페이스 표시
+    if country == "미국":
+        manage_us_tickers()
     
     # 국가가 변경되었는지 확인
     if country != st.session_state.current_country:
@@ -508,7 +617,18 @@ def main():
     
     # 데이터가 로딩되지 않은 경우 안내
     if not st.session_state.data_loaded:
-        st.info(f"👆 사이드바에서 '📊 데이터 로딩' 버튼을 클릭하여 {country} 주식 데이터를 불러오세요.")
+        ticker_count = len(st.session_state.us_tickers) if country == "미국" else 100
+        st.info(f"👆 사이드바에서 '📊 데이터 로딩' 버튼을 클릭하여 {country} 주식 데이터({ticker_count}개 종목)를 불러오세요.")
+        
+        # 미국 주식인 경우 현재 등록된 티커 미리보기
+        if country == "미국":
+            with st.expander("📋 현재 등록된 미국 주식 티커 미리보기"):
+                current_tickers = st.session_state.us_tickers
+                st.write(f"총 {len(current_tickers)}개 종목이 등록되어 있습니다.")
+                # 10개씩 한 줄에 표시
+                ticker_chunks = [current_tickers[i:i+10] for i in range(0, len(current_tickers), 10)]
+                for chunk in ticker_chunks:
+                    st.write(" • ".join(chunk))
         return
     
     # 현재 선택된 국가의 데이터 가져오기
@@ -533,7 +653,7 @@ def main():
         **RSI (Relative Strength Index)**: 14일 기준, 과매수(70 이상)/과매도(30 이하) 판단
         
         **볼린저 밴드 %B**: 현재가가 볼린저 밴드 내에서 차지하는 위치 (0~1)
-        - 0.5: 중간선(이동평균선) 위치
+        - 0.5: 중간선 (이동평균선) 위치
         - 1.0 이상: 상단 밴드 돌파
         - 0.0 이하: 하단 밴드 이탈
         
@@ -544,6 +664,13 @@ def main():
         - 현재 변동성과 과거 평균 변동성 비교 가능
         
         **시가총액 표시**: T(조), B(십억), M(백만) 단위로 축약 표시
+        
+        ---
+        
+        **🔧 미국 주식 티커 관리 기능**:
+        - 사이드바에서 원하는 미국 주식 티커를 추가/제거할 수 있습니다
+        - 추가 시 자동으로 유효성 검증을 실시합니다
+        - 초기화 버튼으로 기본 상위 25개 종목으로 되돌릴 수 있습니다
         """)
 
 if __name__ == "__main__":
