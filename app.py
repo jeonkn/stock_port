@@ -10,7 +10,7 @@ import time
 st.set_page_config(page_title="한국/미국 주식 기술적 분석", layout="wide")
 
 # 미국 주식 시총 상위 50개 티커 (주기적으로 업데이트 필요)
-US_TOP50_TICKERS = ["MSFT", "GOOG", "META", "AMZN", "AAPL", "TSLA", "NVDA", "AVGO", "ORCL", "PLTR", "IONQ", "RKLB", "TEM", "HIMS", "CRDO", "CLS", "NVO", "JOBY", "SPOT", "OKLO", "RCL", "NBIS", "JPM", "PGY", "SMCI", "AMD"]
+US_TOP50_TICKERS = ["MSFT", "GOOG", "META", "AMZN", "AAPL", "TSLA", "NVDA", "AVGO", "ORCL", "PLTR", "IONQ", "RKLB", "TEM", "HIMS", "CRDO", "CLS", "NVO", "JOBY", "SPOT", "OKLO", "RCL", "NBIS", "JPM", "PGY", "SMCI"]
 
 def format_market_cap(value):
     """시가총액을 축약 형태로 표시"""
@@ -24,20 +24,20 @@ def format_market_cap(value):
         return f"{value:,.0f}"
 
 @st.cache_data(ttl=3600)  # 1시간 캐시
-def get_market_cap_top50():
-    """시총 상위 50개 종목 조회 (한국)"""
+def get_market_cap_top100():
+    """시총 상위 100개 종목 조회 (한국)"""
     try:
         today = datetime.now().strftime("%Y%m%d")
         # 코스피 + 코스닥 전체 종목의 시가총액 조회
         kospi_cap = stock.get_market_cap_by_ticker(today, market="KOSPI")
         kosdaq_cap = stock.get_market_cap_by_ticker(today, market="KOSDAQ")
         
-        # 합치고 시가총액 기준 상위 50개 선택
+        # 합치고 시가총액 기준 상위 100개 선택
         all_cap = pd.concat([kospi_cap, kosdaq_cap])
-        top50 = all_cap.nlargest(50, '시가총액')
+        top100 = all_cap.nlargest(100, '시가총액')
         
         # 종목명 추가
-        tickers = top50.index.tolist()
+        tickers = top100.index.tolist()
         names = []
         for ticker in tickers:
             try:
@@ -46,8 +46,8 @@ def get_market_cap_top50():
             except:
                 names.append(f"종목{ticker}")
         
-        top50['종목명'] = names
-        return top50
+        top100['종목명'] = names
+        return top100
     except Exception as e:
         st.error(f"시가총액 데이터 조회 오류: {e}")
         return pd.DataFrame()
@@ -255,14 +255,14 @@ def calculate_technical_indicators_us(ticker, period_days=252):
 
 def load_korean_stocks():
     """한국 주식 데이터 로딩"""
-    with st.spinner("한국 주식 시가총액 상위 50개 종목 조회 중..."):
-        top50_data = get_market_cap_top50()
+    with st.spinner("한국 주식 시가총액 상위 100개 종목 조회 중..."):
+        top100_data = get_market_cap_top100()
     
-    if top50_data.empty:
+    if top100_data.empty:
         st.error("데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.")
         return None
     
-    st.success(f"총 {len(top50_data)}개 종목 조회 완료")
+    st.success(f"총 {len(top100_data)}개 종목 조회 완료")
     
     # 진행 상태 표시
     progress_bar = st.progress(0)
@@ -272,9 +272,9 @@ def load_korean_stocks():
     results = []
     
     # 각 종목별 기술적 지표 계산
-    for i, (ticker, row) in enumerate(top50_data.iterrows()):
-        status_text.text(f"처리 중: {row['종목명']} ({i+1}/{len(top50_data)})")
-        progress_bar.progress((i + 1) / len(top50_data))
+    for i, (ticker, row) in enumerate(top100_data.iterrows()):
+        status_text.text(f"처리 중: {row['종목명']} ({i+1}/{len(top100_data)})")
+        progress_bar.progress((i + 1) / len(top100_data))
         
         indicators = calculate_technical_indicators_kr(ticker)
         
