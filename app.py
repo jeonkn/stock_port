@@ -5,6 +5,7 @@ import yfinance as yf
 import numpy as np
 from datetime import datetime, timedelta
 import time
+import requests
 
 # 페이지 설정
 st.set_page_config(page_title="한국/미국 주식 기술적 분석", layout="wide")
@@ -22,6 +23,249 @@ def format_market_cap(value):
         return f"{value/1e6:.1f}M"
     else:
         return f"{value:,.0f}"
+
+@st.cache_data(ttl=300)  # 5분 캐시
+def get_market_indicators():
+    """주요 시장 지표 조회"""
+    indicators = {}
+    
+    try:
+        # CNN 공포탐욕지수 (Alternative.me API 사용)
+        fear_greed_url = "https://api.alternative.me/fng/"
+        response = requests.get(fear_greed_url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            current_value = int(data['data'][0]['value'])
+            previous_value = int(data['data'][1]['value'])
+            indicators['fear_greed'] = {
+                'name': 'CNN 공포탐욕지수',
+                'current': current_value,
+                'previous': previous_value,
+                'change': current_value - previous_value,
+                'change_pct': ((current_value - previous_value) / previous_value) * 100 if previous_value != 0 else 0
+            }
+    except:
+        indicators['fear_greed'] = {
+            'name': 'CNN 공포탐욕지수',
+            'current': 0,
+            'previous': 0,
+            'change': 0,
+            'change_pct': 0
+        }
+    
+    # yfinance를 사용한 지표들
+    symbols = {
+        'vix': '^VIX',
+        'sp500': '^GSPC',
+        'nasdaq100': '^NDX',
+        'usdkrw': 'KRW=X',
+        'bitcoin': 'BTC-USD',
+        'ethereum': 'ETH-USD'
+    }
+    
+    names = {
+        'vix': 'VIX 지수',
+        'sp500': 'S&P 500',
+        'nasdaq100': '나스닥 100',
+        'usdkrw': '원/달러 환율',
+        'bitcoin': '비트코인',
+        'ethereum': '이더리움'
+    }
+    
+    for key, symbol in symbols.items():
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="5d")
+            
+            if len(hist) >= 2:
+                current = hist['Close'].iloc[-1]
+                previous = hist['Close'].iloc[-2]
+                change = current - previous
+                change_pct = (change / previous) * 100 if previous != 0 else 0
+                
+                indicators[key] = {
+                    'name': names[key],
+                    'current': current,
+                    'previous': previous,
+                    'change': change,
+                    'change_pct': change_pct
+                }
+            else:
+                indicators[key] = {
+                    'name': names[key],
+                    'current': 0,
+                    'previous': 0,
+                    'change': 0,
+                    'change_pct': 0
+                }
+        except:
+            indicators[key] = {
+                'name': names[key],
+                'current': 0,
+                'previous': 0,
+                'change': 0,
+                'change_pct': 0
+            }
+    
+    return indicators
+
+def display_market_indicators():
+    """시장 지표를 박스 형태로 표시"""
+    indicators = get_market_indicators()
+    
+    st.markdown("### 📊 주요 시장 지표")
+    
+    # 첫 번째 행: CNN 공포탐욕지수, VIX, S&P 500, 나스닥 100
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        indicator = indicators['fear_greed']
+        color = "🔴" if indicator['change'] > 0 else "🔵" if indicator['change'] < 0 else "⚪"
+        st.markdown(f"""
+        <div style="
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            background-color: {'rgba(255,0,0,0.1)' if indicator['change'] > 0 else 'rgba(0,0,255,0.1)' if indicator['change'] < 0 else 'rgba(128,128,128,0.1)'};
+            margin-bottom: 10px;
+        ">
+            <h4 style="margin: 0; color: #333;">{color} {indicator['name']}</h4>
+            <h2 style="margin: 5px 0; color: #333;">{indicator['current']:.0f}</h2>
+            <p style="margin: 0; color: {'red' if indicator['change'] > 0 else 'blue' if indicator['change'] < 0 else 'gray'};">
+                {'+' if indicator['change'] > 0 else ''}{indicator['change']:+.0f} ({indicator['change_pct']:+.1f}%)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        indicator = indicators['vix']
+        color = "🔴" if indicator['change'] > 0 else "🔵" if indicator['change'] < 0 else "⚪"
+        st.markdown(f"""
+        <div style="
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            background-color: {'rgba(255,0,0,0.1)' if indicator['change'] > 0 else 'rgba(0,0,255,0.1)' if indicator['change'] < 0 else 'rgba(128,128,128,0.1)'};
+            margin-bottom: 10px;
+        ">
+            <h4 style="margin: 0; color: #333;">{color} {indicator['name']}</h4>
+            <h2 style="margin: 5px 0; color: #333;">{indicator['current']:.2f}</h2>
+            <p style="margin: 0; color: {'red' if indicator['change'] > 0 else 'blue' if indicator['change'] < 0 else 'gray'};">
+                {'+' if indicator['change'] > 0 else ''}{indicator['change']:+.2f} ({indicator['change_pct']:+.1f}%)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        indicator = indicators['sp500']
+        color = "🔴" if indicator['change'] > 0 else "🔵" if indicator['change'] < 0 else "⚪"
+        st.markdown(f"""
+        <div style="
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            background-color: {'rgba(255,0,0,0.1)' if indicator['change'] > 0 else 'rgba(0,0,255,0.1)' if indicator['change'] < 0 else 'rgba(128,128,128,0.1)'};
+            margin-bottom: 10px;
+        ">
+            <h4 style="margin: 0; color: #333;">{color} {indicator['name']}</h4>
+            <h2 style="margin: 5px 0; color: #333;">{indicator['current']:.0f}</h2>
+            <p style="margin: 0; color: {'red' if indicator['change'] > 0 else 'blue' if indicator['change'] < 0 else 'gray'};">
+                {'+' if indicator['change'] > 0 else ''}{indicator['change']:+.0f} ({indicator['change_pct']:+.1f}%)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        indicator = indicators['nasdaq100']
+        color = "🔴" if indicator['change'] > 0 else "🔵" if indicator['change'] < 0 else "⚪"
+        st.markdown(f"""
+        <div style="
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            background-color: {'rgba(255,0,0,0.1)' if indicator['change'] > 0 else 'rgba(0,0,255,0.1)' if indicator['change'] < 0 else 'rgba(128,128,128,0.1)'};
+            margin-bottom: 10px;
+        ">
+            <h4 style="margin: 0; color: #333;">{color} {indicator['name']}</h4>
+            <h2 style="margin: 5px 0; color: #333;">{indicator['current']:.0f}</h2>
+            <p style="margin: 0; color: {'red' if indicator['change'] > 0 else 'blue' if indicator['change'] < 0 else 'gray'};">
+                {'+' if indicator['change'] > 0 else ''}{indicator['change']:+.0f} ({indicator['change_pct']:+.1f}%)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # 두 번째 행: 원/달러 환율, 비트코인, 이더리움
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        indicator = indicators['usdkrw']
+        color = "🔴" if indicator['change'] > 0 else "🔵" if indicator['change'] < 0 else "⚪"
+        st.markdown(f"""
+        <div style="
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            background-color: {'rgba(255,0,0,0.1)' if indicator['change'] > 0 else 'rgba(0,0,255,0.1)' if indicator['change'] < 0 else 'rgba(128,128,128,0.1)'};
+            margin-bottom: 10px;
+        ">
+            <h4 style="margin: 0; color: #333;">{color} {indicator['name']}</h4>
+            <h2 style="margin: 5px 0; color: #333;">{indicator['current']:.0f}원</h2>
+            <p style="margin: 0; color: {'red' if indicator['change'] > 0 else 'blue' if indicator['change'] < 0 else 'gray'};">
+                {'+' if indicator['change'] > 0 else ''}{indicator['change']:+.0f}원 ({indicator['change_pct']:+.1f}%)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        indicator = indicators['bitcoin']
+        color = "🔴" if indicator['change'] > 0 else "🔵" if indicator['change'] < 0 else "⚪"
+        st.markdown(f"""
+        <div style="
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            background-color: {'rgba(255,0,0,0.1)' if indicator['change'] > 0 else 'rgba(0,0,255,0.1)' if indicator['change'] < 0 else 'rgba(128,128,128,0.1)'};
+            margin-bottom: 10px;
+        ">
+            <h4 style="margin: 0; color: #333;">{color} {indicator['name']}</h4>
+            <h2 style="margin: 5px 0; color: #333;">${indicator['current']:,.0f}</h2>
+            <p style="margin: 0; color: {'red' if indicator['change'] > 0 else 'blue' if indicator['change'] < 0 else 'gray'};">
+                {'+' if indicator['change'] > 0 else ''}${indicator['change']:+,.0f} ({indicator['change_pct']:+.1f}%)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        indicator = indicators['ethereum']
+        color = "🔴" if indicator['change'] > 0 else "🔵" if indicator['change'] < 0 else "⚪"
+        st.markdown(f"""
+        <div style="
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            background-color: {'rgba(255,0,0,0.1)' if indicator['change'] > 0 else 'rgba(0,0,255,0.1)' if indicator['change'] < 0 else 'rgba(128,128,128,0.1)'};
+            margin-bottom: 10px;
+        ">
+            <h4 style="margin: 0; color: #333;">{color} {indicator['name']}</h4>
+            <h2 style="margin: 5px 0; color: #333;">${indicator['current']:,.0f}</h2>
+            <p style="margin: 0; color: {'red' if indicator['change'] > 0 else 'blue' if indicator['change'] < 0 else 'gray'};">
+                {'+' if indicator['change'] > 0 else ''}${indicator['change']:+,.0f} ({indicator['change_pct']:+.1f}%)
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col4:
+        # 빈 컬럼 (필요시 추가 지표 사용)
+        st.write("")
+    
+    st.markdown("---")  # 구분선
 
 @st.cache_data(ttl=3600)  # 1시간 캐시
 def get_market_cap_top100():
@@ -283,60 +527,6 @@ def load_korean_stocks():
     results = []
     
     # 각 종목별 기술적 지표 계산
-    for i, (ticker, row) in enumerate(top100_data.iterrows()):
-        status_text.text(f"처리 중: {row['종목명']} ({i+1}/{len(top100_data)})")
-        progress_bar.progress((i + 1) / len(top100_data))
-        
-        indicators = calculate_technical_indicators_kr(ticker)
-        
-        if indicators:
-            results.append({
-                '종목코드': ticker,
-                '종목명': row['종목명'],
-                '현재가': f"{indicators['current_price']:,}원",
-                'RSI': f"{indicators['rsi']:.2f}",
-                '볼린저밴드%B': f"{indicators['percent_b']:.4f}",
-                '볼린저밴드폭': f"{indicators['band_width']:.4f}",
-                '52주볼린저밴드폭평균': f"{indicators['avg_52w_band_width']:.4f}",
-                '시가총액': format_market_cap(row['시가총액']),
-                # 필터링용 원본 값 저장
-                'RSI_raw': indicators['rsi'],
-                'percent_b_raw': indicators['percent_b'],
-                'band_width_raw': indicators['band_width'],
-                'avg_52w_band_width_raw': indicators['avg_52w_band_width']
-            })
-        
-        # API 호출 제한을 위한 짧은 대기
-        time.sleep(0.1)
-    
-    # 진행 상태 숨기기
-    progress_bar.empty()
-    status_text.empty()
-    
-    return pd.DataFrame(results)
-
-def load_us_stocks():
-    """미국 주식 데이터 로딩"""
-    # 세션 상태에서 사용자 정의 티커 리스트 가져오기
-    current_tickers = st.session_state.get('us_tickers', DEFAULT_US_TICKERS.copy())
-    
-    with st.spinner(f"미국 주식 {len(current_tickers)}개 종목 조회 중..."):
-        us_stocks = get_us_stock_data(current_tickers)
-    
-    if us_stocks.empty:
-        st.error("미국 주식 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.")
-        return None
-    
-    st.success(f"총 {len(us_stocks)}개 종목 조회 완료")
-    
-    # 진행 상태 표시
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    # 결과 저장할 리스트
-    results = []
-    
-    # 각 종목별 기술적 지표 계산
     for i, row in us_stocks.iterrows():
         ticker = row['ticker']
         name = row['name']
@@ -537,6 +727,9 @@ def main():
     st.title("🌏 한국/미국 주식 기술적 분석")
     st.markdown("### 시가총액 상위 종목의 기술적 지표 분석")
     
+    # 주요 시장 지표 표시
+    display_market_indicators()
+    
     # 세션 상태 초기화
     if 'korean_data' not in st.session_state:
         st.session_state.korean_data = None
@@ -671,7 +864,70 @@ def main():
         - 사이드바에서 원하는 미국 주식 티커를 추가/제거할 수 있습니다
         - 추가 시 자동으로 유효성 검증을 실시합니다
         - 초기화 버튼으로 기본 상위 25개 종목으로 되돌릴 수 있습니다
+        
+        ---
+        
+        **📊 주요 시장 지표**:
+        - CNN 공포탐욕지수: 0-100 스케일로 시장 심리 측정
+        - VIX 지수: 시장 변동성 측정 (공포 지수)
+        - S&P 500 & 나스닥 100: 미국 주요 주가지수
+        - 원/달러 환율: 한국 투자자 기준 중요 지표
+        - 비트코인 & 이더리움: 주요 암호화폐 가격
         """)
 
 if __name__ == "__main__":
-    main()
+    main()저장할 리스트
+    results = []
+    
+    # 각 종목별 기술적 지표 계산
+    for i, (ticker, row) in enumerate(top100_data.iterrows()):
+        status_text.text(f"처리 중: {row['종목명']} ({i+1}/{len(top100_data)})")
+        progress_bar.progress((i + 1) / len(top100_data))
+        
+        indicators = calculate_technical_indicators_kr(ticker)
+        
+        if indicators:
+            results.append({
+                '종목코드': ticker,
+                '종목명': row['종목명'],
+                '현재가': f"{indicators['current_price']:,}원",
+                'RSI': f"{indicators['rsi']:.2f}",
+                '볼린저밴드%B': f"{indicators['percent_b']:.4f}",
+                '볼린저밴드폭': f"{indicators['band_width']:.4f}",
+                '52주볼린저밴드폭평균': f"{indicators['avg_52w_band_width']:.4f}",
+                '시가총액': format_market_cap(row['시가총액']),
+                # 필터링용 원본 값 저장
+                'RSI_raw': indicators['rsi'],
+                'percent_b_raw': indicators['percent_b'],
+                'band_width_raw': indicators['band_width'],
+                'avg_52w_band_width_raw': indicators['avg_52w_band_width']
+            })
+        
+        # API 호출 제한을 위한 짧은 대기
+        time.sleep(0.1)
+    
+    # 진행 상태 숨기기
+    progress_bar.empty()
+    status_text.empty()
+    
+    return pd.DataFrame(results)
+
+def load_us_stocks():
+    """미국 주식 데이터 로딩"""
+    # 세션 상태에서 사용자 정의 티커 리스트 가져오기
+    current_tickers = st.session_state.get('us_tickers', DEFAULT_US_TICKERS.copy())
+    
+    with st.spinner(f"미국 주식 {len(current_tickers)}개 종목 조회 중..."):
+        us_stocks = get_us_stock_data(current_tickers)
+    
+    if us_stocks.empty:
+        st.error("미국 주식 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.")
+        return None
+    
+    st.success(f"총 {len(us_stocks)}개 종목 조회 완료")
+    
+    # 진행 상태 표시
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    # 결과
