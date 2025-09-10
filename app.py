@@ -5,12 +5,225 @@ import yfinance as yf
 import numpy as np
 from datetime import datetime, timedelta
 import time
+import requests
+from bs4 import BeautifulSoup
+import re
+import fear_and_greed
 
 # 페이지 설정
 st.set_page_config(page_title="한국/미국 주식 기술적 분석", layout="wide")
 
 # 기본 미국 주식 시총 상위 50개 티커 (기본값)
 DEFAULT_US_TICKERS = ["MSFT", "GOOG", "META", "AMZN", "AAPL", "TSLA", "NVDA", "AVGO", "ORCL", "PLTR", "IONQ", "RKLB", "TEM", "HIMS", "CRDO", "CLS", "NVO", "JOBY", "SPOT", "OKLO", "RCL", "NBIS", "JPM", "PGY", "SMCI"]
+
+@st.cache_data(ttl=1800)  # 30분 캐시
+def get_market_indicators():
+    """주요 지수들 조회"""
+    indicators = {}
+    
+    try:
+        # CNN 공탐지수 가져오기
+        try:
+            fg = fear_and_greed.get()        
+            fg_score = float(fg[0])
+            fg_score = round(fg_score,2)
+            fg_status = fg[1]
+   
+            indicators['CNN_FEAR_GREED'] = {
+                'name': '공탐지수 ' + fg_status,
+                'current': fg_score,
+                'previous': fg_score,
+                'symbol': '',
+                'format': 'str'                
+            }
+        except Exception as e:
+            st.warning(f"CNN 공탐지수 조회 실패: {e}")
+        
+        # VIX 지수
+        try:
+            vix = yf.Ticker("^VIX")
+            vix_data = vix.history(period="2d")
+            if len(vix_data) >= 2:
+                indicators['VIX'] = {
+                    'name': 'VIX 지수',
+                    'current': vix_data['Close'].iloc[-1],
+                    'previous': vix_data['Close'].iloc[-2],
+                    'symbol': '',
+                    'format': 'float'
+                }
+        except:
+            pass
+        
+        # S&P 500
+        try:
+            sp500 = yf.Ticker("^GSPC")
+            sp500_data = sp500.history(period="2d")
+            if len(sp500_data) >= 2:
+                indicators['SP500'] = {
+                    'name': 'S&P 500',
+                    'current': sp500_data['Close'].iloc[-1],
+                    'previous': sp500_data['Close'].iloc[-2],
+                    'symbol': '',
+                    'format': 'float'
+                }
+        except:
+            pass
+        
+        # 나스닥 100
+        try:
+            nasdaq = yf.Ticker("^NDX")
+            nasdaq_data = nasdaq.history(period="2d")
+            if len(nasdaq_data) >= 2:
+                indicators['NASDAQ100'] = {
+                    'name': '나스닥 100',
+                    'current': nasdaq_data['Close'].iloc[-1],
+                    'previous': nasdaq_data['Close'].iloc[-2],
+                    'symbol': '',
+                    'format': 'float'
+                }
+        except:
+            pass
+        
+        # 원달러 환율
+        try:
+            usdkrw = yf.Ticker("KRW=X")
+            usdkrw_data = usdkrw.history(period="2d")
+            if len(usdkrw_data) >= 2:
+                indicators['USDKRW'] = {
+                    'name': '원/달러 환율',
+                    'current': usdkrw_data['Close'].iloc[-1],
+                    'previous': usdkrw_data['Close'].iloc[-2],
+                    'symbol': '₩',
+                    'format': 'float'
+                }
+        except:
+            pass
+        
+        # 비트코인
+        try:
+            btc = yf.Ticker("BTC-USD")
+            btc_data = btc.history(period="2d")
+            if len(btc_data) >= 2:
+                indicators['BTC'] = {
+                    'name': '비트코인',
+                    'current': btc_data['Close'].iloc[-1],
+                    'previous': btc_data['Close'].iloc[-2],
+                    'symbol': '$',
+                    'format': 'float'
+                }
+        except:
+            pass
+        
+        # 이더리움
+        try:
+            eth = yf.Ticker("ETH-USD")
+            eth_data = eth.history(period="2d")
+            if len(eth_data) >= 2:
+                indicators['ETH'] = {
+                    'name': '이더리움',
+                    'current': eth_data['Close'].iloc[-1],
+                    'previous': eth_data['Close'].iloc[-2],
+                    'symbol': '$',
+                    'format': 'float'
+                }
+        except:
+            pass
+            
+    except Exception as e:
+        st.error(f"지수 데이터 조회 중 오류: {e}")
+    
+    return indicators
+
+def display_market_indicators():
+    """주요 지수들을 박스 형태로 표시"""
+    indicators = get_market_indicators()
+    
+    if not indicators:
+        st.warning("지수 데이터를 불러올 수 없습니다.")
+        return
+    
+    st.markdown("### 📊 주요 지수 모니터링")
+    
+    # 지수들을 3개씩 나누어 표시
+    indicator_keys = list(indicators.keys())
+    
+    # 첫 번째 줄: 4개
+    if len(indicator_keys) >= 4:
+        cols = st.columns(4)
+        for i, key in enumerate(indicator_keys[:4]):
+            with cols[i]:
+                display_indicator_box(indicators[key])
+    
+    # 두 번째 줄: 나머지
+    if len(indicator_keys) > 4:
+        remaining = indicator_keys[4:]
+        cols = st.columns(len(remaining))
+        for i, key in enumerate(remaining):
+            with cols[i]:
+                display_indicator_box(indicators[key])
+    
+    st.markdown("---")
+
+def display_indicator_box(indicator_data):
+    """개별 지수 박스 표시"""
+    name = indicator_data['name']
+    current = indicator_data['current']
+    previous = indicator_data['previous']
+    symbol = indicator_data['symbol']
+    format_type = indicator_data['format']
+    
+    # 변화율 계산
+    if previous != 0:
+        change_pct = ((current - previous) / previous) * 100
+    else:
+        change_pct = 0
+    
+    # 색상 결정
+    if change_pct > 0:
+        color = "#FF4B4B"  # 빨간색 (상승)
+        arrow = "▲"
+    elif change_pct < 0:
+        color = "#1E88E5"  # 파란색 (하락)
+        arrow = "▼"
+    else:
+        color = "#888888"  # 회색 (변화없음)
+        arrow = "—"
+    
+    # 값 포맷팅
+    if format_type == 'integer':
+        current_str = f"{int(current)}"
+    else:
+        if current >= 1000:
+            current_str = f"{current:,.2f}"
+        else:
+            current_str = f"{current:.2f}"
+    
+    # HTML 박스 생성
+    st.markdown(f"""
+    <div style="
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 5px 0;
+        background-color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    ">
+        <div style="font-size: 14px; color: #666; margin-bottom: 8px;">
+            {name}
+        </div>
+        <div style="font-size: 20px; font-weight: bold; margin-bottom: 8px;">
+            {symbol}{current_str}
+        </div>
+        <div style="color: {color}; font-weight: bold; font-size: 16px;">
+            {arrow} {abs(change_pct):.2f}%
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def format_market_cap(value):
     """시가총액을 축약 형태로 표시"""
@@ -527,7 +740,7 @@ def display_results(df, original_count, filter_applied, country):
     # CSV 다운로드
     csv_data = display_df.to_csv(index=False, encoding='utf-8-sig')
     st.download_button(
-        label="📥 CSV 파일 다운로드",
+        label="💾 CSV 파일 다운로드",
         data=csv_data,
         file_name=f"{country.lower()}_stocks_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv"
@@ -536,6 +749,9 @@ def display_results(df, original_count, filter_applied, country):
 def main():
     st.title("🌏 한국/미국 주식 기술적 분석")
     st.markdown("### 시가총액 상위 종목의 기술적 지표 분석")
+    
+    # 주요 지수 모니터링 표시
+    display_market_indicators()
     
     # 세션 상태 초기화
     if 'korean_data' not in st.session_state:
@@ -671,6 +887,16 @@ def main():
         - 사이드바에서 원하는 미국 주식 티커를 추가/제거할 수 있습니다
         - 추가 시 자동으로 유효성 검증을 실시합니다
         - 초기화 버튼으로 기본 상위 25개 종목으로 되돌릴 수 있습니다
+        
+        ---
+        
+        **📊 주요 지수 설명**:
+        - **CNN 공탐지수**: 0-100 스케일로 시장의 공포와 탐욕을 측정
+        - **VIX 지수**: 변동성 지수, 시장의 불안 정도를 나타냄
+        - **S&P 500**: 미국 대형주 500개 기업의 주가지수
+        - **나스닥 100**: 나스닥 상장 대형 비금융주 100개 기업 지수
+        - **원/달러 환율**: KRW/USD 환율
+        - **비트코인/이더리움**: 주요 암호화폐 가격
         """)
 
 if __name__ == "__main__":
