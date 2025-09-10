@@ -876,7 +876,7 @@ def main():
         """)
 
 if __name__ == "__main__":
-    main()저장할 리스트
+    main()
     results = []
     
     # 각 종목별 기술적 지표 계산
