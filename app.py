@@ -30,8 +30,8 @@ def get_market_indicators():
             fg_status = fg[1]
    
             indicators['CNN_FEAR_GREED'] = {
-                'name': '공탐지수 ' + fg_status,
-                'current': fg_score,
+                'name': '공탐지수',
+                'current': fg_score + '(' + fg_status + ')',
                 'previous': fg_score,
                 'symbol': '',
                 'format': 'str'                
