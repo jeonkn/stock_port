@@ -1,4 +1,4 @@
-ㄴimport streamlit as st
+import streamlit as st
 import pandas as pd
 from pykrx import stock
 import yfinance as yf
