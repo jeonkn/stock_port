@@ -1,4 +1,4 @@
-import streamlit as st
+ㄴimport streamlit as st
 import pandas as pd
 from pykrx import stock
 import yfinance as yf
@@ -31,7 +31,7 @@ def get_market_indicators():
    
             indicators['CNN_FEAR_GREED'] = {
                 'name': '공탐지수',
-                'current': fg_score + '(' + fg_status + ')',
+                'current': str(fg_score) + '(' + fg_status + ')',
                 'previous': fg_score,
                 'symbol': '',
                 'format': 'str'                
