@@ -71,7 +71,7 @@ def get_market_indicators():
         
         # 나스닥 100
         try:
-            nasdaq = yf.Ticker("^NDX")
+            nasdaq = yf.Ticker("^IXIC")
             nasdaq_data = nasdaq.history(period="2d")
             if len(nasdaq_data) >= 2:
                 indicators['NASDAQ100'] = {
