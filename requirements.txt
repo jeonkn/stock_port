@@ -4,3 +4,4 @@ pykrx==1.0.51
 streamlit==1.49.1
 yfinance==0.2.65
 fear-and-greed==0.4
+plotly==6.3.0
