@@ -9,6 +9,8 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import fear_and_greed
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # 페이지 설정
 st.set_page_config(page_title="한국/미국 주식 기술적 분석", layout="wide")
@@ -477,6 +479,206 @@ def calculate_technical_indicators_us(ticker, period_days=252):
         st.warning(f"종목 {ticker} 데이터 처리 오류: {e}")
         return None
 
+def get_stock_chart_data_kr(ticker, period_days=252):
+    """한국 주식 차트 데이터 조회"""
+    try:
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=period_days + 100)
+        
+        end_str = end_date.strftime("%Y%m%d")
+        start_str = start_date.strftime("%Y%m%d")
+        
+        # OHLCV 데이터 조회
+        df = stock.get_market_ohlcv_by_date(start_str, end_str, ticker)
+        
+        if df.empty or len(df) < 200:
+            return None
+        
+        # 인덱스를 datetime으로 변환
+        df.index = pd.to_datetime(df.index)
+        
+        # 영어 컬럼명으로 변경
+        df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+        
+        # 이동평균선 계산
+        df['MA5'] = df['Close'].rolling(window=5).mean()
+        df['MA20'] = df['Close'].rolling(window=20).mean()
+        df['MA200'] = df['Close'].rolling(window=200).mean()
+        
+        # 볼린저 밴드 계산
+        rolling_mean = df['Close'].rolling(window=20).mean()
+        rolling_std = df['Close'].rolling(window=20).std()
+        df['BB_Upper'] = rolling_mean + (rolling_std * 2)
+        df['BB_Lower'] = rolling_mean - (rolling_std * 2)
+        df['BB_Middle'] = rolling_mean
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"차트 데이터 조회 오류: {e}")
+        return None
+
+def get_stock_chart_data_us(ticker, period_days=252):
+    """미국 주식 차트 데이터 조회"""
+    try:
+        stock_data = yf.Ticker(ticker)
+        df = stock_data.history(period="1y")
+        
+        if df.empty or len(df) < 200:
+            return None
+        
+        # 이동평균선 계산
+        df['MA5'] = df['Close'].rolling(window=5).mean()
+        df['MA20'] = df['Close'].rolling(window=20).mean()
+        df['MA200'] = df['Close'].rolling(window=200).mean()
+        
+        # 볼린저 밴드 계산
+        rolling_mean = df['Close'].rolling(window=20).mean()
+        rolling_std = df['Close'].rolling(window=20).std()
+        df['BB_Upper'] = rolling_mean + (rolling_std * 2)
+        df['BB_Lower'] = rolling_mean - (rolling_std * 2)
+        df['BB_Middle'] = rolling_mean
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"차트 데이터 조회 오류: {e}")
+        return None
+
+def create_candlestick_chart(df, ticker, company_name):
+    """캔들스틱 차트 생성"""
+    try:
+        # 서브플롯 생성 (가격 차트 + 볼륨 차트)
+        fig = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.1,
+            subplot_titles=[f'{company_name} ({ticker})', '거래량'],
+            row_heights=[0.7, 0.3]
+        )
+        
+        # 캔들스틱 차트 (양봉: 빨강, 음봉: 파랑)
+        fig.add_trace(
+            go.Candlestick(
+                x=df.index,
+                open=df['Open'],
+                high=df['High'],
+                low=df['Low'],
+                close=df['Close'],
+                name='가격',
+                increasing=dict(fillcolor='red', line=dict(color='red')),
+                decreasing=dict(fillcolor='blue', line=dict(color='blue'))
+            ),
+            row=1, col=1
+        )
+        
+        # 볼린저 밴드
+        fig.add_trace(
+            go.Scatter(
+                x=df.index, 
+                y=df['BB_Upper'],
+                mode='lines',
+                name='볼린저 상단',
+                line=dict(color='gray', width=1, dash='dash'),
+                opacity=0.7
+            ),
+            row=1, col=1
+        )
+        
+        fig.add_trace(
+            go.Scatter(
+                x=df.index, 
+                y=df['BB_Lower'],
+                mode='lines',
+                name='볼린저 하단',
+                line=dict(color='gray', width=1, dash='dash'),
+                fill='tonexty',
+                fillcolor='rgba(128, 128, 128, 0.1)',
+                opacity=0.7
+            ),
+            row=1, col=1
+        )
+        
+        fig.add_trace(
+            go.Scatter(
+                x=df.index, 
+                y=df['BB_Middle'],
+                mode='lines',
+                name='볼린저 중간선',
+                line=dict(color='purple', width=1)
+            ),
+            row=1, col=1
+        )
+        
+        # 이동평균선
+        fig.add_trace(
+            go.Scatter(
+                x=df.index, 
+                y=df['MA5'],
+                mode='lines',
+                name='5일선',
+                line=dict(color='orange', width=2)
+            ),
+            row=1, col=1
+        )
+        
+        fig.add_trace(
+            go.Scatter(
+                x=df.index, 
+                y=df['MA200'],
+                mode='lines',
+                name='200일선',
+                line=dict(color='green', width=2)
+            ),
+            row=1, col=1
+        )
+        
+        # 거래량 차트
+        colors = ['red' if close >= open else 'blue' for close, open in zip(df['Close'], df['Open'])]
+        fig.add_trace(
+            go.Bar(
+                x=df.index,
+                y=df['Volume'],
+                name='거래량',
+                marker_color=colors,
+                opacity=0.6
+            ),
+            row=2, col=1
+        )
+        
+        # 레이아웃 설정
+        fig.update_layout(
+            title=f'{company_name} ({ticker}) 일봉차트',
+            xaxis_title='날짜',
+            yaxis_title='가격',
+            template='plotly_white',
+            height=700,
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
+        )
+        
+        # x축 설정 (캔들스틱에서 주말 제거)
+        fig.update_xaxes(
+            rangeslider_visible=False,
+            type='date'
+        )
+        
+        # y축 설정
+        fig.update_yaxes(title_text="가격", row=1, col=1)
+        fig.update_yaxes(title_text="거래량", row=2, col=1)
+        
+        return fig
+        
+    except Exception as e:
+        st.error(f"차트 생성 중 오류: {e}")
+        return None
+
 def load_korean_stocks():
     """한국 주식 데이터 로딩"""
     with st.spinner("한국 주식 시가총액 상위 100개 종목 조회 중..."):
@@ -687,6 +889,9 @@ def apply_filters(df, rsi_filter, bb_percent_filter, bb_width_filter):
     if rsi_filter == "40 미만":
         filtered_df = filtered_df[filtered_df['RSI_raw'] < 40]
         filter_applied = True
+    elif rsi_filter == "50 미만":
+        filtered_df = filtered_df[filtered_df['RSI_raw'] < 50]
+        filter_applied = True
     
     # 볼린저 밴드 %B 필터
     if bb_percent_filter == "0.5 미만":
@@ -720,11 +925,13 @@ def display_results(df, original_count, filter_applied, country):
         
     st.markdown(f"**업데이트 시간**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # 테이블 표시
-    st.dataframe(
+    # 테이블 표시 - 클릭 가능한 종목명으로 변경
+    event = st.dataframe(
         display_df,
         use_container_width=True,
         hide_index=True,
+        on_select='rerun',
+        selection_mode='single-row',
         column_config={
             '종목코드': st.column_config.TextColumn('종목코드', width=100),
             '종목명': st.column_config.TextColumn('종목명', width=120),
@@ -736,6 +943,26 @@ def display_results(df, original_count, filter_applied, country):
             '시가총액': st.column_config.TextColumn('시가총액', width=100)
         }
     )
+    
+    # 종목 선택 시 차트 표시
+    if event.selection['rows']:
+        selected_row_index = event.selection['rows'][0]
+        selected_row = display_df.iloc[selected_row_index]
+        ticker = selected_row['종목코드']
+        company_name = selected_row['종목명']
+        
+        with st.spinner(f"{company_name} 차트 로딩 중..."):
+            if country == "한국":
+                chart_data = get_stock_chart_data_kr(ticker)
+            else:
+                chart_data = get_stock_chart_data_us(ticker)
+            
+            if chart_data is not None and not chart_data.empty:
+                chart_fig = create_candlestick_chart(chart_data, ticker, company_name)
+                if chart_fig:
+                    st.plotly_chart(chart_fig, use_container_width=True)
+            else:
+                st.error(f"{company_name} 차트 데이터를 불러올 수 없습니다.")
     
     # CSV 다운로드
     csv_data = display_df.to_csv(index=False, encoding='utf-8-sig')
@@ -796,7 +1023,7 @@ def main():
     
     rsi_filter = st.sidebar.selectbox(
         "RSI 필터",
-        ["전체", "40 미만"],
+        ["전체", "40 미만", "50 미만"],
         index=0
     )
     
@@ -880,6 +1107,15 @@ def main():
         - 현재 변동성과 과거 평균 변동성 비교 가능
         
         **시가총액 표시**: T(조), B(십억), M(백만) 단위로 축약 표시
+        
+        ---
+        
+        **📈 차트 기능**:
+        - 테이블에서 종목을 클릭하면 해당 종목의 일봉 차트가 표시됩니다
+        - 캔들차트: 양봉(빨간색), 음봉(파란색)
+        - 볼린저 밴드 (상단/중간/하단)
+        - 이동평균선: 5일선(주황), 200일선(녹색)
+        - 거래량 차트도 함께 표시
         
         ---
         
