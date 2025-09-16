@@ -681,9 +681,12 @@ def apply_filters(df, rsi_filter, bb_percent_filter, bb_width_filter):
     filtered_df = df.copy()
     filter_applied = False
     
-    # RSI 필터
+    # RSI 필터 - 50 미만 옵션 추가
     if rsi_filter == "40 미만":
         filtered_df = filtered_df[filtered_df['RSI_raw'] < 40]
+        filter_applied = True
+    elif rsi_filter == "50 미만":
+        filtered_df = filtered_df[filtered_df['RSI_raw'] < 50]
         filter_applied = True
     
     # 볼린저 밴드 %B 필터
@@ -745,7 +748,7 @@ def display_results(df, original_count, filter_applied, country):
     )
 
 def main():
-    st.title("🌏 한국/미국 주식 기술적 분석")
+    st.title("🌍 한국/미국 주식 기술적 분석")
     st.markdown("### 시가총액 상위 종목의 기술적 지표 분석")
     
     # 주요 지수 모니터링 표시
@@ -768,7 +771,7 @@ def main():
     
     # 국가 선택
     country = st.sidebar.selectbox(
-        "🌏 국가 선택",
+        "🌍 국가 선택",
         ["한국", "미국"],
         index=0
     )
@@ -789,12 +792,12 @@ def main():
     with col2:
         refresh_button = st.button("🔄 새로고침")
     
-    # 필터링 옵션
+    # 필터링 옵션 - RSI 필터에 50 미만 옵션 추가
     st.sidebar.subheader("📊 필터링 옵션")
     
     rsi_filter = st.sidebar.selectbox(
         "RSI 필터",
-        ["전체", "40 미만"],
+        ["전체", "40 미만", "50 미만"],
         index=0
     )
     
