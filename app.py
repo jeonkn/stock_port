@@ -12,7 +12,7 @@ import fear_and_greed
 st.set_page_config(page_title="한국/미국 주식 기술적 분석", layout="wide")
 
 # 기본 미국 주식 시총 상위 50개 티커 (기본값)
-DEFAULT_US_TICKERS = ["MSFT", "GOOG", "META", "AMZN", "AAPL", "TSLA", "NVDA", "AVGO", "ORCL", "PLTR", "IONQ", "RKLB", "TEM", "HIMS", "CRDO", "CLS", "NVO", "JOBY", "SPOT", "OKLO", "RCL", "NBIS", "JPM", "PGY", "SMCI"]
+DEFAULT_US_TICKERS = ["MSFT", "GOOG", "META", "AMZN", "AAPL", "TSLA", "NVDA", "AVGO", "ORCL", "PLTR", "IONQ", "RKLB", "TEM", "HIMS", "CRDO", "CLS", "NVO", "JOBY", "SPOT", "OKLO", "RCL", "NBIS", "JPM", "PGY", "SMCI", "CRWV", "UPST"]
 
 @st.cache_data(ttl=1800)  # 30분 캐시
 def get_market_indicators():
