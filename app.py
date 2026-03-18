@@ -1,3 +1,14 @@
+# app.py 맨 위에 추가
+import sys
+import types
+
+# pkg_resources가 없을 경우 더미 모듈로 대체
+try:
+    import pkg_resources
+except ModuleNotFoundError:
+    pkg_resources = types.ModuleType("pkg_resources")
+    sys.modules["pkg_resources"] = pkg_resources
+    
 import streamlit as st
 import pandas as pd
 from pykrx import stock
