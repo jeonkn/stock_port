@@ -1,16 +1,13 @@
-# 임시 디버깅 - 확인 후 제거
-import streamlit as st
-from pykrx import stock
-from datetime import datetime, timedelta
-
 st.write("=== pykrx 디버깅 ===")
-for i in range(10):
-    date = (datetime.now() - timedelta(days=i)).strftime("%Y%m%d")
-    try:
-        df = stock.get_market_cap_by_ticker(date, market="KOSPI")
-        st.write(f"{date}: shape={df.shape}, columns={list(df.columns)}, empty={df.empty}")
-        if not df.empty:
-            st.write(df.head(2))
-            break
-    except Exception as e:
-        st.write(f"{date}: 에러 - {e}")
+date = "20260309"
+try:
+    df = stock.get_market_cap_by_ticker(date, market="KOSPI")
+    st.write(f"shape: {df.shape}")
+    st.write(f"columns: {list(df.columns)}")
+    st.write(f"index name: {df.index.name}")
+    st.write(f"dtypes: {df.dtypes}")
+    st.write(df.head(3))
+except Exception as e:
+    st.write(f"에러: {e}")
+    import traceback
+    st.write(traceback.format_exc())
