@@ -1,12 +1,22 @@
-# app.py 맨 위에 추가
 import sys
 import types
+import os
 
-# pkg_resources가 없을 경우 더미 모듈로 대체
 try:
     import pkg_resources
 except ModuleNotFoundError:
     pkg_resources = types.ModuleType("pkg_resources")
+    
+    # pykrx가 폰트 경로를 찾을 때 사용하는 함수만 구현
+    def _resource_filename(package_or_requirement, resource_name):
+        import importlib.util
+        spec = importlib.util.find_spec(package_or_requirement)
+        if spec and spec.origin:
+            package_dir = os.path.dirname(spec.origin)
+            return os.path.join(package_dir, resource_name)
+        return resource_name
+    
+    pkg_resources.resource_filename = _resource_filename
     sys.modules["pkg_resources"] = pkg_resources
     
 import streamlit as st
