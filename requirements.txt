@@ -1,7 +1,7 @@
 setuptools>=68.0.0
 numpy>=1.24.0,<2.0
 pandas>=2.0.0
-pykrx @ git+https://github.com/sharebook-kr/pykrx.git
+pykrx==1.0.51
 streamlit==1.49.1
 yfinance==0.2.65
 fear-and-greed==0.4
