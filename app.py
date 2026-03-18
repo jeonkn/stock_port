@@ -1,5 +1,3 @@
-import setuptools
-import pkg_resources
 import streamlit as st
 import pandas as pd
 from pykrx import stock
