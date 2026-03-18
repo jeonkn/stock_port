@@ -1,6 +1,5 @@
 import sys, types, os
 
-# pkg_resources 패치
 try:
     import pkg_resources
 except ModuleNotFoundError:
@@ -16,54 +15,21 @@ except ModuleNotFoundError:
     mod.working_set = []
     sys.modules["pkg_resources"] = mod
 
-# pykrx get_market_cap_by_ticker 몽키패치
-from pykrx.stock import market as _market_module
-import pandas as pd
-from datetime import datetime, timedelta
-
-_original_fetch = _market_module.MKD30040
-
-class _PatchedMKD30040(_market_module.MKD30040):
-    def fetch(self, date, market):
-        df = super().fetch(date, market)
-        # 영문 컬럼명 → 한국어로 매핑
-        col_map = {
-            'ISU_SRT_CD': '종목코드',
-            'MKT_CLSS_TP_CD': '시장구분',
-            'TDD_CLSPRC': '종가',
-            'MKTCAP': '시가총액',
-            'ACC_TRDVOL': '거래량',
-            'ACC_TRDVAL': '거래대금',
-            'LIST_SHRS': '상장주식수',
-        }
-        # 실제 컬럼 중 매핑 가능한 것만 변환
-        rename = {k: v for k, v in col_map.items() if k in df.columns}
-        if rename:
-            df = df.rename(columns=rename)
-        return df
-
-_market_module.MKD30040 = _PatchedMKD30040
-
 import streamlit as st
-from datetime import datetime, timedelta
 
-st.write("=== pykrx 내부 구조 확인 ===")
-import pykrx.stock as ps
-st.write(dir(ps))
+st.write("=== pykrx 파일 구조 확인 ===")
 
-try:
-    from pykrx.stock.market.ticker import MKD30040
-    date = "20260309"
-    fetcher = MKD30040()
-    raw = fetcher.fetch(date, "KOSPI")
-    st.write(f"columns: {list(raw.columns)}")
-    st.write(raw.head(3))
-except Exception as e:
-    import traceback
-    st.write(traceback.format_exc())
+# pykrx 설치 경로 확인
+import importlib.util
+spec = importlib.util.find_spec("pykrx")
+st.write(f"pykrx 경로: {spec.origin}")
 
-try:
-    import pykrx.stock.market as m
-    st.write("market 모듈:", dir(m))
-except Exception as e:
-    st.write(f"market 모듈 없음: {e}")
+import os
+pykrx_dir = os.path.dirname(spec.origin)
+for root, dirs, files in os.walk(pykrx_dir):
+    level = root.replace(pykrx_dir, '').count(os.sep)
+    indent = ' ' * 2 * level
+    st.write(f"{indent}{os.path.basename(root)}/")
+    if level < 3:
+        for f in files:
+            st.write(f"{indent}  {f}")
