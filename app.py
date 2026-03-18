@@ -47,15 +47,23 @@ _market_module.MKD30040 = _PatchedMKD30040
 import streamlit as st
 from datetime import datetime, timedelta
 
-st.write("=== 원본 컬럼 확인 ===")
-from pykrx.stock.market.ticker import MKD30040
-date = "20260309"
+st.write("=== pykrx 내부 구조 확인 ===")
+import pykrx.stock as ps
+st.write(dir(ps))
+
 try:
+    from pykrx.stock.market.ticker import MKD30040
+    date = "20260309"
     fetcher = MKD30040()
     raw = fetcher.fetch(date, "KOSPI")
-    st.write(f"shape: {raw.shape}")
     st.write(f"columns: {list(raw.columns)}")
     st.write(raw.head(3))
 except Exception as e:
     import traceback
     st.write(traceback.format_exc())
+
+try:
+    import pykrx.stock.market as m
+    st.write("market 모듈:", dir(m))
+except Exception as e:
+    st.write(f"market 모듈 없음: {e}")
