@@ -255,20 +255,32 @@ def format_market_cap(value):
     else:
         return f"{value:,.0f}"
 
-@st.cache_data(ttl=3600)  # 1시간 캐시
+@st.cache_data(ttl=3600)
 def get_market_cap_top100():
     """시총 상위 100개 종목 조회 (한국)"""
     try:
         today = datetime.now().strftime("%Y%m%d")
-        # 코스피 + 코스닥 전체 종목의 시가총액 조회
+        
         kospi_cap = stock.get_market_cap_by_ticker(today, market="KOSPI")
         kosdaq_cap = stock.get_market_cap_by_ticker(today, market="KOSDAQ")
         
-        # 합치고 시가총액 기준 상위 100개 선택
+        # 실제 컬럼명 확인 후 시가총액 컬럼 자동 탐지
+        def find_market_cap_col(df):
+            for col in df.columns:
+                if '시가총액' in col or 'Marcap' in col or 'marcap' in col:
+                    return col
+            return df.columns[0]  # 첫 번째 컬럼 fallback
+        
+        kospi_col = find_market_cap_col(kospi_cap)
+        kosdaq_col = find_market_cap_col(kosdaq_cap)
+        
+        # 컬럼명 통일
+        kospi_cap = kospi_cap.rename(columns={kospi_col: '시가총액'})
+        kosdaq_cap = kosdaq_cap.rename(columns={kosdaq_col: '시가총액'})
+        
         all_cap = pd.concat([kospi_cap, kosdaq_cap])
         top100 = all_cap.nlargest(100, '시가총액')
         
-        # 종목명 추가
         tickers = top100.index.tolist()
         names = []
         for ticker in tickers:
@@ -280,8 +292,14 @@ def get_market_cap_top100():
         
         top100['종목명'] = names
         return top100
+        
     except Exception as e:
-        st.error(f"시가총액 데이터 조회 오류: {e}")
+        # 실제 컬럼명을 에러 메시지에 포함해서 디버깅
+        try:
+            test = stock.get_market_cap_by_ticker(today, market="KOSPI")
+            st.error(f"시가총액 데이터 조회 오류: {e}\n실제 컬럼명: {list(test.columns)}")
+        except:
+            st.error(f"시가총액 데이터 조회 오류: {e}")
         return pd.DataFrame()
 
 def validate_ticker(ticker):
