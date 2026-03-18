@@ -769,7 +769,7 @@ def display_results(df, original_count, filter_applied, country):
     )
 
 def main():
-    st.title("🌍 한국/미국 주식 기술적 분석")
+    st.title("🌍 KR/US Stock")
     st.markdown("### 시가총액 상위 종목의 기술적 지표 분석")
     
     # 주요 지수 모니터링 표시
