@@ -259,28 +259,42 @@ def format_market_cap(value):
 def get_market_cap_top100():
     """시총 상위 100개 종목 조회 (한국)"""
     try:
-        today = datetime.now().strftime("%Y%m%d")
+        # 최근 영업일 찾기 (최대 10일 전까지 시도)
+        def get_latest_business_day():
+            for i in range(10):
+                date = (datetime.now() - timedelta(days=i)).strftime("%Y%m%d")
+                try:
+                    df = stock.get_market_cap_by_ticker(date, market="KOSPI")
+                    if not df.empty:
+                        return date, df
+                except:
+                    continue
+            return None, pd.DataFrame()
+
+        date, kospi_cap = get_latest_business_day()
         
-        kospi_cap = stock.get_market_cap_by_ticker(today, market="KOSPI")
-        kosdaq_cap = stock.get_market_cap_by_ticker(today, market="KOSDAQ")
-        
-        # 실제 컬럼명 확인 후 시가총액 컬럼 자동 탐지
+        if kospi_cap.empty or date is None:
+            st.error("KOSPI 데이터를 가져올 수 없습니다.")
+            return pd.DataFrame()
+
+        kosdaq_cap = stock.get_market_cap_by_ticker(date, market="KOSDAQ")
+
+        # 컬럼명 자동 탐지
         def find_market_cap_col(df):
             for col in df.columns:
-                if '시가총액' in col or 'Marcap' in col or 'marcap' in col:
+                if '시가총액' in str(col) or 'Marcap' in str(col) or 'marcap' in str(col):
                     return col
-            return df.columns[0]  # 첫 번째 컬럼 fallback
-        
+            return df.columns[0]
+
         kospi_col = find_market_cap_col(kospi_cap)
         kosdaq_col = find_market_cap_col(kosdaq_cap)
-        
-        # 컬럼명 통일
+
         kospi_cap = kospi_cap.rename(columns={kospi_col: '시가총액'})
         kosdaq_cap = kosdaq_cap.rename(columns={kosdaq_col: '시가총액'})
-        
+
         all_cap = pd.concat([kospi_cap, kosdaq_cap])
         top100 = all_cap.nlargest(100, '시가총액')
-        
+
         tickers = top100.index.tolist()
         names = []
         for ticker in tickers:
@@ -289,17 +303,17 @@ def get_market_cap_top100():
                 names.append(name)
             except:
                 names.append(f"종목{ticker}")
-        
+
         top100['종목명'] = names
         return top100
-        
+
     except Exception as e:
-        # 실제 컬럼명을 에러 메시지에 포함해서 디버깅
         try:
-            test = stock.get_market_cap_by_ticker(today, market="KOSPI")
-            st.error(f"시가총액 데이터 조회 오류: {e}\n실제 컬럼명: {list(test.columns)}")
-        except:
-            st.error(f"시가총액 데이터 조회 오류: {e}")
+            date = datetime.now().strftime("%Y%m%d")
+            test = stock.get_market_cap_by_ticker(date, market="KOSPI")
+            st.error(f"오류: {e} | 실제 컬럼명: {list(test.columns)}")
+        except Exception as e2:
+            st.error(f"오류: {e} / {e2}")
         return pd.DataFrame()
 
 def validate_ticker(ticker):
