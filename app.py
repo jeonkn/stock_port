@@ -1,3 +1,8 @@
+# 임시 디버깅 - 확인 후 제거
+import streamlit as st
+from pykrx import stock
+from datetime import datetime, timedelta
+
 st.write("=== pykrx 디버깅 ===")
 date = "20260309"
 try:
